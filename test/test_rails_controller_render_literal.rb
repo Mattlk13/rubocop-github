@@ -13,6 +13,18 @@ class TestRailsControllerRenderLiteral < CopTest
     investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
       class ProductsController < ActionController::Base
         def index
+          render(MyClass, title: "foo", bar: "baz")
+        end
+      end
+    RUBY
+
+    assert_equal 0, cop.offenses.count
+  end
+
+  def test_render_string_literal_class_instance_no_offense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
           render(MyClass.new(title: "foo", bar: "baz"))
         end
       end
@@ -22,6 +34,18 @@ class TestRailsControllerRenderLiteral < CopTest
   end
 
   def test_render_string_literal_module_class_name_no_offense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
+          render(Module::MyClass, title: "foo", bar: "baz")
+        end
+      end
+    RUBY
+
+    assert_equal 0, cop.offenses.count
+  end
+
+  def test_render_string_literal_module_class_instance_no_offense
     investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
       class ProductsController < ActionController::Base
         def index
@@ -292,6 +316,19 @@ class TestRailsControllerRenderLiteral < CopTest
     assert_equal "render must be used with a string literal or an instance of a Class", cop.offenses[0].message
   end
 
+  def test_render_to_string_variable_offense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
+          render_to_string(magic_string)
+        end
+      end
+    RUBY
+
+    assert_equal 1, cop.offenses.count
+    assert_equal "render must be used with a string literal or an instance of a Class", cop.offenses[0].message
+  end
+
   def test_render_action_variable_offense
     investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
       class ProductsController < ActionController::Base
@@ -355,5 +392,66 @@ class TestRailsControllerRenderLiteral < CopTest
 
     assert_equal 1, cop.offenses.count
     assert_equal "render must be used with a string literal or an instance of a Class", cop.offenses[0].message
+  end
+
+  def test_render_shorthand_static_locals_no_offsense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
+          render "products/index", locals: { product: product }
+        end
+      end
+    RUBY
+
+    assert_equal 0, cop.offenses.count
+  end
+
+  def test_render_partial_static_locals_no_offsense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
+          render partial: "products/index", locals: { product: product }
+        end
+      end
+    RUBY
+
+    assert_equal 0, cop.offenses.count
+  end
+
+  def test_render_literal_dynamic_options_offense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
+          render "products/product", options
+        end
+      end
+    RUBY
+
+    assert_equal 1, cop.offenses.count
+  end
+
+  def test_render_literal_dynamic_locals_offense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
+          render "products/product", locals: locals
+        end
+      end
+    RUBY
+
+    assert_equal 1, cop.offenses.count
+  end
+
+
+  def test_render_literal_dynamic_local_key_offense
+    investigate cop, <<-RUBY, "app/controllers/products_controller.rb"
+      class ProductsController < ActionController::Base
+        def index
+          render "products/product", locals: { product_key => product }
+        end
+      end
+    RUBY
+
+    assert_equal 1, cop.offenses.count
   end
 end
